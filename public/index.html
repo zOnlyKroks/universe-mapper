@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Data</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #1e1e1e; /* Dark background color */
+      color: #e0e0e0; /* Light text color for readability */
+    }
+    .container {
+      width: 90%;
+      max-width: 1200px;
+      margin: 20px auto;
+      background: #2c2c2c; /* Darker container background */
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #ffffff; /* White color for headings */
+    }
+    .search-container {
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    #search-input {
+      padding: 10px;
+      border: 1px solid #444; /* Dark border color */
+      border-radius: 4px;
+      width: 300px;
+      background-color: #333; /* Dark input background */
+      color: #e0e0e0; /* Light text color in input */
+    }
+    #search-button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      background-color: #007bff; /* Blue background for button */
+      color: #fff; /* White text color for button */
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #search-button:hover {
+      background-color: #0056b3; /* Darker blue on hover */
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #444; /* Darker border color */
+    }
+    th {
+      background-color: #333; /* Darker background for table headers */
+      color: #e0e0e0; /* Light text color for headers */
+      cursor: pointer;
+    }
+    th.sortable:hover {
+      background-color: #444; /* Slightly lighter background on hover */
+    }
+    th.sortable .sort-icon {
+      margin-left: 5px;
+      font-size: 0.8em;
+    }
+    th.sortable .sort-icon.asc::after {
+      content: '▲';
+    }
+    th.sortable .sort-icon.desc::after {
+      content: '▼';
+    }
+    tr.clickable:hover {
+      background-color: #3c3c3c; /* Slightly lighter row background on hover */
+    }
+    #planet-info-container {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80%;
+      max-width: 600px;
+      background-color: #2c2c2c; /* Dark background for modal */
+      border: 1px solid #444; /* Darker border for modal */
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+      padding: 20px;
+      z-index: 1000;
+      overflow-y: auto;
+      max-height: 80vh;
+      border-radius: 8px;
+      color: #e0e0e0; /* Light text color in modal */
+    }
+    #planet-info-container.show {
+      display: block;
+    }
+    #planet-info-container .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      cursor: pointer;
+      font-size: 1.5em;
+      color: #e0e0e0; /* Light color for close button */
+    }
+    #planet-info-container .close-btn:hover {
+      color: #ff4d4d; /* Red color on hover for close button */
+    }
+    .planet-info {
+      margin-bottom: 20px;
+    }
+    .planet-info h3 {
+      margin: 0;
+      color: #ffffff; /* White color for planet names */
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>System Data</h1>
+    <div class="search-container">
+      <input type="text" id="search-input" placeholder="Search by System Name or ID">
+      <button id="search-button">Search</button>
+    </div>
+    <table id="system-data-table">
+      <thead>
+        <tr>
+          <th class="sortable" data-sort="system_id">System ID <span class="sort-icon"></span></th>
+          <th class="sortable" data-sort="name">System Name <span class="sort-icon"></span></th>
+          <th class="sortable" data-sort="security_status">Security Status <span class="sort-icon"></span></th>
+          <th class="sortable" data-sort="stations">Total Number of Stations <span class="sort-icon"></span></th>
+          <th class="sortable" data-sort="planets">Total Number of Planets <span class="sort-icon"></span></th>
+          <th class="sortable" data-sort="ship_jumps">Ship Jumps <span class="sort-icon"></span></th>
+          <th class="sortable" data-sort="npc_kills">NPC Kills <span class="sort-icon"></span></th>
+          <th class="sortable" data-sort="pod_kills">Pod Kills <span class="sort-icon"></span></th>
+          <th class="sortable" data-sort="ship_kills">Ship Kills <span class="sort-icon"></span></th>
+        </tr>
+      </thead>
+      <tbody id="system-data-body">
+        <!-- Data rows will be inserted here dynamically using JavaScript -->
+      </tbody>
+    </table>
+  </div>
+
+  <div id="planet-info-container">
+    <span class="close-btn">&times;</span>
+    <div id="planet-info-content">
+      <!-- Planet details will be injected here -->
+    </div>
+  </div>
+
+  <script>
+    let originalData = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const response = await fetch('/api/system-data');
+        const data = await response.json();
+        originalData = data;
+        renderTable(data);
+
+        document.querySelectorAll('.sortable').forEach(header => {
+          header.addEventListener('click', () => {
+            const sortKey = header.dataset.sort;
+            const currentOrder = header.dataset.order || 'desc';
+            const newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+            header.dataset.order = newOrder;
+
+            clearSortIcons();
+            setSortIcon(header, newOrder);
+            sortTable(sortKey, newOrder);
+          });
+        });
+
+        document.getElementById('search-button').addEventListener('click', () => {
+          performSearch();
+        });
+
+        document.getElementById('search-input').addEventListener('input', () => {
+          performSearch();
+        });
+
+      } catch (error) {
+        console.error('Error fetching system data:', error);
+      }
+    });
+
+    function renderTable(data) {
+      const tableBody = document.getElementById('system-data-body');
+      tableBody.innerHTML = '';
+
+      data.forEach(system => {
+        const row = document.createElement('tr');
+        row.classList.add('clickable');
+
+        row.innerHTML = `
+          <td>${system.system_id}</td>
+          <td>${system.name}</td>
+          <td>${system.security_status.toFixed(2)}</td>
+          <td>${system.stations ? system.stations.length : 0}</td>
+          <td>${system.planets ? system.planets.length : 0}</td>
+          <td>${system.ship_jumps}</td>
+          <td>${system.npc_kills}</td>
+          <td>${system.pod_kills}</td>
+          <td>${system.ship_kills}</td>
+        `;
+
+        row.addEventListener('click', async () => {
+          const planetInfoContainer = document.getElementById('planet-info-container');
+          const planetInfoContent = document.getElementById('planet-info-content');
+          planetInfoContent.innerHTML = '';
+
+          if (system.planets && system.planets.length > 0) {
+            const planetPromises = system.planets.map(async (entry) => {
+              let planetId;
+
+              if (typeof entry === 'object' && entry.planet_id) {
+                planetId = entry.planet_id;
+              } else if (typeof entry === 'number') {
+                planetId = entry;
+              } else {
+                console.warn('Unknown planet entry format:', entry);
+                return null;
+              }
+
+              try {
+                const res = await fetch(`/api/planet?planet_id=${planetId}`);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const planetData = await res.json();
+                return planetData;
+              } catch (err) {
+                console.error('Error fetching planet details for ID:', planetId, err);
+                return null;
+              }
+            });
+
+            try {
+              const planets = await Promise.all(planetPromises);
+
+              if (planets.length > 0) {
+                planets.forEach(async planet => {
+                  if (planet) {
+                    const planetInfo = document.createElement('div');
+                    planetInfo.classList.add('planet-info');
+
+                    const planetTypeJson = await fetch(`/api/planet/type?planet_type_id=${planet.type_id}`);
+                    if (!planetTypeJson.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                    const text = await planetTypeJson.json();
+
+                    planetInfo.innerHTML = `
+                      <h3>Planet Name: ${planet.name}</h3>
+                      <p><strong>Planet Type:</strong> ${text}</p>
+                    `;
+                    planetInfoContent.appendChild(planetInfo);
+                  }
+                });
+              } else {
+                planetInfoContent.innerHTML = '<p>No planet details available.</p>';
+              }
+
+              planetInfoContainer.classList.add('show');
+            } catch (err) {
+              console.error('Error processing planet details:', err);
+              planetInfoContent.innerHTML = '<p>Error processing planet details.</p>';
+              planetInfoContainer.classList.add('show');
+            }
+          } else {
+            planetInfoContent.innerHTML = '<p>No planets available for this system.</p>';
+            planetInfoContainer.classList.add('show');
+          }
+        });
+
+        tableBody.appendChild(row);
+      });
+    }
+
+    function sortTable(sortKey, order) {
+      const sortedData = [...originalData].sort((a, b) => {
+        const valueA = sortKey === 'stations' || sortKey === 'planets' ? (a[sortKey] ? a[sortKey].length : 0) : a[sortKey];
+        const valueB = sortKey === 'stations' || sortKey === 'planets' ? (b[sortKey] ? b[sortKey].length : 0) : b[sortKey];
+
+        if (typeof valueA === 'number' && typeof valueB === 'number') {
+          return order === 'asc' ? valueA - valueB : valueB - valueA;
+        } else {
+          return order === 'asc' ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+        }
+      });
+
+      renderTable(sortedData);
+    }
+
+    function clearSortIcons() {
+      document.querySelectorAll('.sortable .sort-icon').forEach(icon => {
+        icon.classList.remove('asc', 'desc');
+      });
+    }
+
+    function setSortIcon(header, order) {
+      const icon = header.querySelector('.sort-icon');
+      if (order === 'asc') {
+        icon.classList.add('asc');
+        icon.classList.remove('desc');
+      } else {
+        icon.classList.add('desc');
+        icon.classList.remove('asc');
+      }
+    }
+
+    function performSearch() {
+      const query = document.getElementById('search-input').value.toLowerCase();
+      const filteredData = originalData.filter(system =>
+        system.system_id.toString().includes(query) ||
+        system.name.toLowerCase().includes(query)
+      );
+      renderTable(filteredData);
+    }
+
+    document.querySelector('#planet-info-container .close-btn').addEventListener('click', () => {
+      document.getElementById('planet-info-container').classList.remove('show');
+    });
+  </script>
+</body>
+</html>
